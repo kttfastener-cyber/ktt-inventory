@@ -3,17 +3,110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aplikasi Inventory Saya</title>
+    <title>Smart Inventory</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 50px; }
-        .box { border: 1px solid #ccc; padding: 20px; border-radius: 10px; display: inline-block; }
+        body { background-color: #f8f9fa; }
+        .card { border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .status-offline { color: red; font-weight: bold; display: none; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h1>📦 Inventory App</h1>
-        <p>Aplikasi sedang dalam tahap pengembangan.</p>
-        <button onclick="alert('Halo! Nanti ini akan jadi tombol simpan')">Cek Koneksi</button>
+
+<div class="container mt-4">
+    <div class="card p-4">
+        <h2 class="text-center mb-4">📦 Input Barang</h2>
+        
+        <div id="offline-alert" class="alert alert-warning status-offline text-center">
+            Mode Offline: Data disimpan sementara di HP
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Nama Barang</label>
+            <input type="text" id="nama" class="form-control" placeholder="Contoh: Kertas A4">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Jumlah</label>
+            <input type="number" id="jumlah" class="form-control" placeholder="0">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Tipe Transaksi</label>
+            <select id="tipe" class="form-select">
+                <option value="Masuk">Barang Masuk</option>
+                <option value="Keluar">Barang Keluar</option>
+            </select>
+        </div>
+
+        <button onclick="prosesSimpan()" class="btn btn-primary w-100 p-2">Simpan Data</button>
     </div>
+</div>
+
+<script>
+    const API_URL = "GANTI_DENGAN_URL_WEB_APP_ANDA";
+
+    // Cek Status Koneksi
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
+
+    function updateStatus() {
+        const alertBox = document.getElementById('offline-alert');
+        if (navigator.onLine) {
+            alertBox.style.display = 'none';
+            sinkronisasiData(); // Otomatis kirim data tertunda saat online
+        } else {
+            alertBox.style.display = 'block';
+        }
+    }
+
+    async function prosesSimpan() {
+        const data = {
+            nama: document.getElementById('nama').value,
+            jumlah: document.getElementById('jumlah').value,
+            tipe: document.getElementById('tipe').value
+        };
+
+        if (navigator.onLine) {
+            await kirimKeSheets(data);
+        } else {
+            let antrean = JSON.parse(localStorage.getItem('antrean')) || [];
+            antrean.push(data);
+            localStorage.setItem('antrean', JSON.stringify(antrean));
+            alert("Tersimpan secara Offline!");
+            resetForm();
+        }
+    }
+
+    async function kirimKeSheets(data) {
+        try {
+            await fetch(API_URL, {
+                method: "POST",
+                mode: "no-cors", // Penting untuk Google Apps Script
+                body: JSON.stringify(data)
+            });
+            alert("Berhasil masuk ke Google Sheets!");
+            resetForm();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function sinkronisasiData() {
+        let antrean = JSON.parse(localStorage.getItem('antrean')) || [];
+        if (antrean.length > 0) {
+            for (let item of antrean) {
+                await kirimKeSheets(item);
+            }
+            localStorage.removeItem('antrean');
+            alert("Sinkronisasi otomatis berhasil!");
+        }
+    }
+
+    function resetForm() {
+        document.getElementById('nama').value = "";
+        document.getElementById('jumlah').value = "";
+    }
+</script>
 </body>
 </html>
