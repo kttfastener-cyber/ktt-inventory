@@ -3,110 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Inventory</title>
+    <title>Fast Inventory</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; }
-        .card { border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .status-offline { color: red; font-weight: bold; display: none; }
+        body { background-color: #f4f7f6; padding-bottom: 50px; }
+        .card { border-radius: 12px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .table-container { background: white; border-radius: 12px; padding: 15px; margin-top: 20px; }
+        .badge-offline { display: none; background: #ff9800; color: white; padding: 5px 10px; border-radius: 5px; font-size: 0.8rem; }
     </style>
 </head>
 <body>
 
 <div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">📦 Smart Inventory</h4>
+        <div id="status-tag" class="badge-offline">Mode Offline</div>
+    </div>
+
     <div class="card p-4">
-        <h2 class="text-center mb-4">📦 Input Barang</h2>
-        
-        <div id="offline-alert" class="alert alert-warning status-offline text-center">
-            Mode Offline: Data disimpan sementara di HP
+        <div class="row g-2">
+            <div class="col-12">
+                <input type="text" id="nama" class="form-control" placeholder="Nama Barang">
+            </div>
+            <div class="col-7">
+                <input type="number" id="jumlah" class="form-control" placeholder="Jumlah">
+            </div>
+            <div class="col-5">
+                <select id="tipe" class="form-select">
+                    <option value="Masuk">Masuk</option>
+                    <option value="Keluar">Keluar</option>
+                </select>
+            </div>
+            <div class="col-12 mt-3">
+                <button onclick="tambahKeAntrean()" class="btn btn-dark w-100">+ Tambah ke Daftar</button>
+            </div>
         </div>
+    </div>
 
-        <div class="mb-3">
-            <label class="form-label">Nama Barang</label>
-            <input type="text" id="nama" class="form-control" placeholder="Contoh: Kertas A4">
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Jumlah</label>
-            <input type="number" id="jumlah" class="form-control" placeholder="0">
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Tipe Transaksi</label>
-            <select id="tipe" class="form-select">
-                <option value="Masuk">Barang Masuk</option>
-                <option value="Keluar">Barang Keluar</option>
-            </select>
-        </div>
-
-        <button onclick="prosesSimpan()" class="btn btn-primary w-100 p-2">Simpan Data</button>
+    <div class="table-container">
+        <h6>Daftar Tunggu (<span id="count">0</span>)</h6>
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Barang</th>
+                    <th>Qty</th>
+                    <th>Tipe</th>
+                </tr>
+            </thead>
+            <tbody id="tabel-antrean">
+                </tbody>
+        </table>
+        <button id="btn-kirim" onclick="kirimSemua()" class="btn btn-success w-100 mt-2" disabled>
+            Kirim Semua ke Cloud
+        </button>
+        <p id="msg" class="text-center small mt-2 text-muted"></p>
     </div>
 </div>
 
 <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbyBhZruei14IIPuVhHddgxKLcoXTDqfN6RT0pKHVwE32nbgz27auww39L3-dfs7uMAP/exec";
+    let antreanLokal = JSON.parse(localStorage.getItem('antrean_inv')) || [];
 
-    // Cek Status Koneksi
-    window.addEventListener('online', updateStatus);
-    window.addEventListener('offline', updateStatus);
+    // Fungsi menambah ke daftar (Bukan ke Google dulu)
+    function tambahKeAntrean() {
+        const nama = document.getElementById('nama').value;
+        const jumlah = document.getElementById('jumlah').value;
+        const tipe = document.getElementById('tipe').value;
 
-    function updateStatus() {
-        const alertBox = document.getElementById('offline-alert');
-        if (navigator.onLine) {
-            alertBox.style.display = 'none';
-            sinkronisasiData(); // Otomatis kirim data tertunda saat online
-        } else {
-            alertBox.style.display = 'block';
-        }
-    }
+        if(!nama || !jumlah) return alert("Isi nama & jumlah!");
 
-    async function prosesSimpan() {
-        const data = {
-            nama: document.getElementById('nama').value,
-            jumlah: document.getElementById('jumlah').value,
-            tipe: document.getElementById('tipe').value
-        };
-
-        if (navigator.onLine) {
-            await kirimKeSheets(data);
-        } else {
-            let antrean = JSON.parse(localStorage.getItem('antrean')) || [];
-            antrean.push(data);
-            localStorage.setItem('antrean', JSON.stringify(antrean));
-            alert("Tersimpan secara Offline!");
-            resetForm();
-        }
-    }
-
-    async function kirimKeSheets(data) {
-        try {
-            await fetch(API_URL, {
-                method: "POST",
-                mode: "no-cors", // Penting untuk Google Apps Script
-                body: JSON.stringify(data)
-            });
-            alert("Berhasil masuk ke Google Sheets!");
-            resetForm();
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-    async function sinkronisasiData() {
-        let antrean = JSON.parse(localStorage.getItem('antrean')) || [];
-        if (antrean.length > 0) {
-            for (let item of antrean) {
-                await kirimKeSheets(item);
-            }
-            localStorage.removeItem('antrean');
-            alert("Sinkronisasi otomatis berhasil!");
-        }
-    }
-
-    function resetForm() {
+        const item = { nama, jumlah, tipe, tgl: new Date().toLocaleString() };
+        antreanLokal.push(item);
+        simpanDanRender();
+        
         document.getElementById('nama').value = "";
         document.getElementById('jumlah').value = "";
     }
+
+    function simpanDanRender() {
+        localStorage.setItem('antrean_inv', JSON.stringify(antreanLokal));
+        const tbody = document.getElementById('tabel-antrean');
+        const btnKirim = document.getElementById('btn-kirim');
+        const count = document.getElementById('count');
+        
+        tbody.innerHTML = antreanLokal.map((item, index) => `
+            <tr>
+                <td>${item.nama}</td>
+                <td>${item.jumlah}</td>
+                <td><span class="badge ${item.tipe === 'Masuk' ? 'bg-info' : 'bg-warning'}">${item.tipe}</span></td>
+            </tr>
+        `).join('');
+
+        count.innerText = antreanLokal.length;
+        btnKirim.disabled = antreanLokal.length === 0;
+    }
+
+    // Fungsi Kirim Semua Sekaligus
+    async function kirimSemua() {
+        if (!navigator.onLine) return alert("Tidak ada internet! Data tetap tersimpan di HP.");
+        
+        const btn = document.getElementById('btn-kirim');
+        const msg = document.getElementById('msg');
+        
+        btn.disabled = true;
+        btn.innerText = "Sedang Mengirim...";
+        
+        try {
+            // Kita kirim satu per satu di belakang layar tanpa interupsi alert
+            for (let i = 0; i < antreanLokal.length; i++) {
+                msg.innerText = `Mengirim ${i+1} dari ${antreanLokal.length}...`;
+                await fetch(API_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    body: JSON.stringify(antreanLokal[i])
+                });
+            }
+            
+            antreanLokal = []; // Kosongkan setelah sukses
+            simpanDanRender();
+            msg.innerText = "✅ Semua data berhasil terkirim!";
+            btn.innerText = "Kirim Semua ke Cloud";
+        } catch (e) {
+            msg.innerText = "❌ Gagal mengirim. Coba lagi nanti.";
+            btn.disabled = false;
+        }
+    }
+
+    // Inisialisasi tampilan saat buka aplikasi
+    window.addEventListener('online', () => document.getElementById('status-tag').style.display='none');
+    window.addEventListener('offline', () => document.getElementById('status-tag').style.display='block');
+    simpanDanRender();
 </script>
 </body>
 </html>
